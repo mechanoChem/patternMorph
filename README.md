@@ -13,24 +13,15 @@ Then run the following commands:
 Please consider citing the following paper:
 
 @article{Garikipati2016,
-
 title   = {Perspectives on the mathematics of biological patterning and morphogenesis},
-
 author  = {Garikipati, K.},
-
 journal = {Journal of the Mechanics and Physics of Solids},
-
-note    = {to appear},
-
+volume  = {99},
+pages   = {192-210},
 doi     = {10.1016/j.jmps.2016.11.013},
-
 archivePrefix = "arXiv",
-
 eprint  = {1610.02584},
-
 primaryClass = "q-bio",
-
-Year    = {2016}
-
+Year    = {2017}
 }
 
