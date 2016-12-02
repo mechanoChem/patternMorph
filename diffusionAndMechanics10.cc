@@ -1,3 +1,7 @@
+/*This is the effective "main" file for the patternMorph code. All relevant classes
+  are defined here. A number of the physics and numerics functions are in local
+  include files. Over time all of the patternMorph code will be refactored
+ */
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/function.h>
@@ -37,7 +41,7 @@
 #include <sstream>
 #include <math.h>
 #include <deal.II/base/tensor_function.h>
-//
+//local include files
 #include "chemo1.h"
 #include "chemo2.h"
 #include "mechanics2.h"
@@ -59,7 +63,6 @@
 #include <deal.II/lac/petsc_solver.h>
 #include <deal.II/lac/petsc_precondition.h>
 #include <deal.II/base/timer.h>
-//#include "quadraturePointData.h"
 using namespace dealii;
 
 template <int dim>
@@ -105,6 +108,7 @@ private:
   //  ComputeProjection<dim> projected_stress;
   ComputeManyProjections<dim> projected_fields;
 
+  //Matrices and vectors
   PETScWrappers::MPI::SparseMatrix system_matrix;
   PETScWrappers::MPI::Vector system_rhs;
   PETScWrappers::MPI::Vector U;
@@ -114,21 +118,24 @@ private:
   MPI_Comm mpi_communicator;
   const unsigned int n_mpi_processes;
   const unsigned int this_mpi_process;
+
   //solution variables
   std::vector<std::string> nodal_solution_names; std::vector<DataComponentInterpretation::DataComponentInterpretation> nodal_data_component_interpretation;
   unsigned int currentIncrement, currentIteration;
   double totalTime, timeCheck1, timeCheck2, currentTime, dt;
 
+  //parallel message stream   
   ConditionalOStream pcout;
-  //parallel message stream                                                                                                                                                          
+
+  //For timing
   TimerOutput computing_timer;
 };
 
 // Constructor
 template <int dim>
 diffusionMechanics<dim>::diffusionMechanics (const unsigned int mech_degree, const unsigned int diff_degree): 
-  mech_degree (mech_degree), 
-  diff_degree (diff_degree), 
+  mech_degree (mech_degree), //polynomial degree for elasticity
+  diff_degree (diff_degree), //polynomial degree fortransport
   omega1_fe (FE_Nothing<dim>(mech_degree), dim,
 	     FE_Q<dim>(diff_degree),   4), //mu and c have same polynomial order basis functions 
   omega2_fe (FE_Nothing<dim>(mech_degree), dim,
@@ -226,7 +233,6 @@ void diffusionMechanics<dim>::assemble_system(){
   PETScWrappers::Vector localized_U0(U0);
   unsigned ncell = 0;
   for (;cell!=endc; ++cell){
-    //    pcout << "Cell = " << ncell <<  std::endl; ++ncell;
     if (cell->subdomain_id() == this_mpi_process)
       {
 	hp_fe_values.reinit(cell);
@@ -245,6 +251,8 @@ void diffusionMechanics<dim>::assemble_system(){
 
 	    local_matrix = 0; local_rhs = 0; 
 	    cell->get_dof_indices (local_dof_indices);	
+
+	    //Local dof vectors: Some are Sacado variables for automatic differentiation
 	    Table<1, Sacado::Fad::DFad<double> > ULocal(dofs_per_cell); Table<1, double > ULocalConv(dofs_per_cell); Table<1, double > U0Local(dofs_per_cell);
 	    for (unsigned int i=0; i<dofs_per_cell; ++i)
 	      {
@@ -254,6 +262,8 @@ void diffusionMechanics<dim>::assemble_system(){
 		ULocalConv[i]= localized_Un(local_dof_indices[i]);
 		U0Local[i]= localized_U0(local_dof_indices[i]);
 	      }
+
+	    //More Sacado variables for automatic differentiation, and some doubles
 	    deformationMap<Sacado::Fad::DFad<double>, dim> defMap(n_q_points); 
 	    getDeformationMap<Sacado::Fad::DFad<double>, dim>(fe_values, 0, ULocal, defMap, currentIteration);
 	    Table<1, Sacado::Fad::DFad<double> > R(dofs_per_cell);
@@ -270,7 +280,8 @@ void diffusionMechanics<dim>::assemble_system(){
 	    dealii::Table<1,double> c2_conv(n_q_points);
 	    dealii::Table<1,Sacado::Fad::DFad<double> > c2(n_q_points), c2_0(n_q_points);
 	    dealii::Table<2,Sacado::Fad::DFad<double> > gradc2(n_q_points, dim);
-	    
+
+	    //Chem potential and concentration, and their gradients	    
 	    for (unsigned int q=0; q<n_q_points; ++q)
 	      {
 		mu1_conv[q] = 0.0; c1_conv[q]=0.0; mu2_conv[q] = 0.0; c2_conv[q]=0.0;
@@ -328,6 +339,8 @@ void diffusionMechanics<dim>::assemble_system(){
 		      }
 		  }
 	      }
+
+	    //Elasticity and transport residuals
 	    residualForMechanics<dim>(fe_values, 0, fe_face_values, ULocal, ULocalConv, R, defMap, cell, c1_conv, c1, c1_0, currentTime, totalTime);
 	    residualForChemo1<dim>(fe_values, dim, fe_face_values, cell, dt, ULocal, ULocalConv, R, defMap, mu1_conv, mu1, gradmu1, c1_conv, c1, c2, gradc1); //mu1, c1
 	    residualForChemo2<dim>(fe_values, dim, fe_face_values, cell, dt, ULocal, ULocalConv, R, defMap, mu2_conv, mu2, gradmu2, c2_conv, c1, c2, gradc2); //mu2, c2	    
@@ -349,7 +362,7 @@ void diffusionMechanics<dim>::assemble_system(){
 								local_dof_indices,
 								system_matrix, system_rhs);
 	  }
-	else
+	else //cell_is_in_omega2_domain(cell)
 	  {
 	    const unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
 	    Assert (dofs_per_cell == omega2_dofs_per_cell, ExcInternalError());
@@ -361,7 +374,7 @@ void diffusionMechanics<dim>::assemble_system(){
 	    local_matrix = 0; local_rhs = 0; 
 	    cell->get_dof_indices (local_dof_indices);	
 
-	    //AD variables
+	    //Local dof vectors: Some are Sacado variables for automatic differentiation
 	    Table<1, Sacado::Fad::DFad<double> > ULocal(dofs_per_cell); Table<1, double > ULocalConv(dofs_per_cell); Table<1, double > U0Local(dofs_per_cell);
 	    for (unsigned int i=0; i<dofs_per_cell; ++i)
 	      {
@@ -372,6 +385,7 @@ void diffusionMechanics<dim>::assemble_system(){
 		U0Local[i]= localized_U0(local_dof_indices[i]);
 	      }
 
+	    //More Sacado variables for automatic differentiation, and some doubles
 	    deformationMap<Sacado::Fad::DFad<double>, dim> defMap(n_q_points); 
 	    getDeformationMap<Sacado::Fad::DFad<double>, dim>(fe_values, 0, ULocal, defMap, currentIteration);
 	    Table<1, Sacado::Fad::DFad<double> > R(dofs_per_cell);
@@ -388,7 +402,8 @@ void diffusionMechanics<dim>::assemble_system(){
 	    dealii::Table<1,double> c2_conv(n_q_points);
 	    dealii::Table<1,Sacado::Fad::DFad<double> > c2(n_q_points), c2_0(n_q_points);
 	    dealii::Table<2,Sacado::Fad::DFad<double> > gradc2(n_q_points, dim);
-	    
+
+	    //Chem potential and concentration, and their gradients	    	    
 	    for (unsigned int q=0; q<n_q_points; ++q)
 	      {
 		mu1_conv[q] = 0.0; c1_conv[q]=0.0; mu2_conv[q] = 0.0; c2_conv[q]=0.0;
@@ -446,6 +461,8 @@ void diffusionMechanics<dim>::assemble_system(){
 		      }
 		  }
 	      }
+
+	    //Elasticity and transport residuals
 	    residualForMechanics<dim>(fe_values, 0, fe_face_values, ULocal, ULocalConv, R, defMap, cell, c1_conv, c1, c1_0, currentTime, totalTime);
 	    residualForChemo1<dim>(fe_values, dim, fe_face_values, cell, dt, ULocal, ULocalConv, R, defMap, mu1_conv, mu1, gradmu1, c1_conv, c1, c2, gradc1); //mu1, c1
 	    residualForChemo2<dim>(fe_values, dim, fe_face_values, cell, dt, ULocal, ULocalConv, R, defMap, mu2_conv, mu2, gradmu2, c2_conv, c1, c2, gradc2); //mu2, c2	    
