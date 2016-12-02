@@ -10,7 +10,7 @@ Then run the following commands:
 
 >make
 
-Please consider citing the following paper:
+Please consider citing the following paper. This code was used to run all the numerical examples in the paper, and is being refactored constantly. So, check back in a few weeks and it's usability will be progressively improved.
 
 @article{Garikipati2016, 
 
