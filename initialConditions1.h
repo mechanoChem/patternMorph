@@ -1,5 +1,5 @@
 /* Iniital Conditions for the coupled transport-mechanics code
-   March 2015 
+   Written by Krishna Garikipati
 */
 #ifndef initial_conds_
 #define initial_conds_

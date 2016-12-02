@@ -1,7 +1,7 @@
 /*
  * supplementaryFunctions.h
  *
- *  Created on: May 11, 2011
+ *  Written by Shiva Rudraraju and Krishna Garikipati
  */
 
 #ifndef SUPPLEMENTARYFUNCTIONS_H_

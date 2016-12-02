@@ -1,4 +1,7 @@
-/* Created by S. Rudraraju, modified by K. Garikipati, June/July 2014*/
+/*Transport physics model for second species. 
+  Implementation is via the chemical potential. Flux is defined in terms of chem pot.
+  Chem pot is related to concentration in a separate pde.
+  Created by Shiva Rudraraju, modified by Krishna Garikipati*/
 #ifndef CHEMO2_H_
 #define CHEMO2_H_
 #include <deal.II/dofs/dof_handler.h>
@@ -47,6 +50,7 @@ void residualForChemo2(const FEValues<dim>& fe_values, unsigned int DOF, FEFaceV
 
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   unsigned int n_q_points= fe_values.n_quadrature_points;
+
   // Mobility and gradient parameter
   Table<1, Sacado::Fad::DFad<double> > mob(n_q_points); 
   for (unsigned int q = 0; q < n_q_points; ++q)
@@ -74,6 +78,7 @@ void residualForChemo2(const FEValues<dim>& fe_values, unsigned int DOF, FEFaceV
   for (unsigned int q = 0; q < n_q_points; ++q){
     reac1[q] = 0.0;
     reac2[q] = 0.0;} //reac[q] = 0.01;
+
   //Threshold concentration for reaction
   Table<1, Sacado::Fad::DFad<double> > c1_reac(n_q_points);
   Table<1, Sacado::Fad::DFad<double> > c2_reac(n_q_points);

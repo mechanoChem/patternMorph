@@ -1,6 +1,6 @@
 /*
  * projectFields.h
- *  Created on: March 5, 2015, K. Garikipati.
+ *  Written by Krishna Garikipati.
  */
 
 #ifndef project_Fields1_

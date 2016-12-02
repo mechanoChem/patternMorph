@@ -1,5 +1,5 @@
 /* Boundary Conditions for the coupled transport-mechanics code
-   Aril 2015 
+   Written by Krishna Garikipati
 */
 #ifndef boundary_conds_
 #define boundary_conds_

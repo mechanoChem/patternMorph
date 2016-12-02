@@ -1,7 +1,6 @@
 /*
- * mechanics.h
- *  Created on: Apr 21, 2011, S. Rudraraju.
- *  Modified June, 2014, K. Garikipati.
+  Elasto-growth code. Uses a single species for inhomogeneous growth.
+  Written by Krishna Garikipati and Shiva Rudraraju
  */
 
 #ifndef MECHANICS_H_
@@ -96,7 +95,6 @@ template <class T, int dim>
 //Mechanics implementation
 template <class T, int dim>
   void evaluateStress(const FEValues<dim>& fe_values,const unsigned int DOF, const Table<1, T>& ULocal, Table<3, T>& P, const deformationMap<T, dim>& defMap, typename hp::DoFHandler<dim>::active_cell_iterator& cell, dealii::Table<1,double>& c_conv, dealii::Table<1, Sacado::Fad::DFad<double> >& c, dealii::Table<1, Sacado::Fad::DFad<double> >& c_0){
-  //  void evaluateStress(const FEValues<dim>& fe_values,const unsigned int DOF, const Table<1, T>& ULocal, Table<3, T>& P, const deformationMap<T, dim>& defMap, double youngsModulus, quadPointProjection<dim, 1>& strain, typename hp::DoFHandler<dim>::active_cell_iterator& cell, dealii::Table<1,double>& c_conv, dealii::Table<1, Sacado::Fad::DFad<double> >& c, dealii::Table<1, Sacado::Fad::DFad<double> >& c_0){
   unsigned int n_q_points= fe_values.n_quadrature_points;
 
   // Stiffer cortical layer with lower saturation 
@@ -219,7 +217,6 @@ template <class T, int dim>
 //Mechanics residual implementation
 template <int dim>
 void residualForMechanics(const FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, Table<1, Sacado::Fad::DFad<double> >& ULocal, Table<1, double>& ULocalConv, Table<1, Sacado::Fad::DFad<double> >& R, deformationMap<Sacado::Fad::DFad<double>, dim>& defMap, typename hp::DoFHandler<dim>::active_cell_iterator& cell, dealii::Table<1,double>& c_conv, dealii::Table<1, Sacado::Fad::DFad<double> >& c, dealii::Table<1, Sacado::Fad::DFad<double> >& c_0, double currentTime, double totalTime){
-  //void residualForMechanics(const FEValues<dim>& fe_values, unsigned int DOF, FEFaceValues<dim>& fe_face_values, Table<1, Sacado::Fad::DFad<double> >& ULocal, Table<1, double>& ULocalConv, Table<1, Sacado::Fad::DFad<double> >& R, deformationMap<Sacado::Fad::DFad<double>, dim>& defMap, double youngsModulus, quadPointProjection<dim, 1>& strain, typename hp::DoFHandler<dim>::active_cell_iterator& cell, dealii::Table<1,double>& c_conv, dealii::Table<1, Sacado::Fad::DFad<double> >& c, dealii::Table<1, Sacado::Fad::DFad<double> >& c_0, double currentTime, double totalTime){
   unsigned int dofs_per_cell= fe_values.dofs_per_cell;
   unsigned int n_q_points= fe_values.n_quadrature_points;
   //Temporary arrays

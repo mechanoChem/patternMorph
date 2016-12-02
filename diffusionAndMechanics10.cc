@@ -1,6 +1,7 @@
 /*This is the effective "main" file for the patternMorph code. All relevant classes
   are defined here. A number of the physics and numerics functions are in local
   include files. Over time all of the patternMorph code will be refactored
+  Written by Krishna Garikipati & Shiva Rudraraju
  */
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/logstream.h>
@@ -135,7 +136,9 @@ private:
 template <int dim>
 diffusionMechanics<dim>::diffusionMechanics (const unsigned int mech_degree, const unsigned int diff_degree): 
   mech_degree (mech_degree), //polynomial degree for elasticity
-  diff_degree (diff_degree), //polynomial degree fortransport
+  diff_degree (diff_degree), //polynomial degree for transport
+
+  //Define pdes to be solved in each domain
   omega1_fe (FE_Nothing<dim>(mech_degree), dim,
 	     FE_Q<dim>(diff_degree),   4), //mu and c have same polynomial order basis functions 
   omega2_fe (FE_Nothing<dim>(mech_degree), dim,
@@ -144,6 +147,7 @@ diffusionMechanics<dim>::diffusionMechanics (const unsigned int mech_degree, con
   n_mpi_processes (Utilities::MPI::n_mpi_processes(mpi_communicator)), 
   this_mpi_process (Utilities::MPI::this_mpi_process(mpi_communicator)), pcout (std::cout, (Utilities::MPI::this_mpi_process(MPI_COMM_WORLD) == 0)),
   computing_timer (pcout, TimerOutput::summary, TimerOutput::wall_times){
+
   //Time stepping parameters
   totalTime = 15000; timeCheck1 = 3.0; timeCheck2 = 30;
   currentIncrement=restart_step; currentTime=restart_time;
@@ -528,11 +532,8 @@ void diffusionMechanics<dim>::assemble_system(){
       VectorTools:: interpolate_boundary_values (dof_handler, 3, ZeroFunction<dim> (totalDOF), boundary_values, boundary_z0); // on z=0 boundary
     }
 
-  //===========done=====================
-
   //End of Applying Dirichlet BC
   dU=0;
- // MatrixTools::apply_boundary_values (boundary_values, system_matrix, dU, system_rhs);
   MatrixTools::apply_boundary_values (boundary_values, system_matrix, dU, system_rhs, false);
 }
 
@@ -563,32 +564,11 @@ void diffusionMechanics<dim>::solve(){
     computing_timer.enter_section("solve");
 
     SolverControl solver_control;
-    //    PETScWrappers::SparseDirectMUMPS solver(solver_control, mpi_communicator);
     PETScWrappers::SolverPreOnly solver(solver_control, mpi_communicator);
-    //    solver.set_symmetric_mode(false);
     PETScWrappers::PreconditionLU preconditioner(system_matrix);
     solver.solve(system_matrix, dU, system_rhs, preconditioner);
-
-    //Iterative solver
-    /*    double solvertolerance = 1.0e-10;
-    SolverControl solver_control (dU.size(), solvertolerance); 
-    PETScWrappers::SolverGMRES solver (solver_control, mpi_communicator); 
-    PETScWrappers::PreconditionJacobi preconditioner(system_matrix);
-    //preconditioner.initialize(system_matrix, 1.0); 
-    dU = 0.0;
-    solver.solve (system_matrix, dU, system_rhs, preconditioner);
-    PetscPrintf(mpi_communicator, "iterative solve complete (Steps:%4u, Tol:%11.4e, InitialRes:%11.4e, Res:%11.4e).\n\n", solver_control.last_step(), solvertolerance,  solver_control.initial_value(), solver_control.last_value());*/
-    
-    /*
-    SolverControl solver_control(maxLinearSolverIterations, relLinearSolverTolerance*residual.l2_norm());
-    PETScWrappers::SolverGMRES solver(solver_control, mpi_communicator);
-    PETScWrappers::PreconditionJacobi preconditioner(jacobian);
-    solver.solve (jacobian, completely_distributed_solutionInc, residual, preconditioner);*/
-
     computing_timer.exit_section("solve");
-
     PetscPrintf(mpi_communicator, "Solved! \n");
-
     PETScWrappers::Vector localized_dU (dU);
     hanging_node_constraints.distribute (localized_dU);
     dU = localized_dU;
@@ -600,7 +580,7 @@ void diffusionMechanics<dim>::solve(){
   Un=U;
 }
 
-//Mark boundaries (display boundary control ==============================modify===========================
+//Mark boundaries
 
 template <int dim>
 void diffusionMechanics<dim>::apply_boundary_conditions(){
@@ -695,24 +675,21 @@ void diffusionMechanics<dim>::refine_initial_grid (){
 template <int dim>
 void diffusionMechanics<dim>::output_results (const unsigned int cycle){
   const PETScWrappers::Vector localized_U(U);
+
   //Write results to VTK file
   if (this_mpi_process == 0)
     {     
-      //      std::ostringstream filename1; filename1 << "shell-" << cycle << ".vtk"; std::ofstream output1 (filename1.str().c_str());
       std::ostringstream filename1; filename1 << "layer-ch3well-2field-dt-large-long" << cycle << ".vtk"; std::ofstream output1 (filename1.str().c_str());
       DataOut<dim, hp::DoFHandler<dim> > data_out; data_out.attach_dof_handler (dof_handler);
+
       //Add nodal DOF data
       data_out.add_data_vector (localized_U, nodal_solution_names, DataOut<dim, hp::DoFHandler<dim> >::type_dof_data, nodal_data_component_interpretation);
-      //      data_out.add_data_vector (localized_U, projected_stress);
       data_out.add_data_vector (localized_U, projected_fields);
       std::vector<unsigned int> partition_int (triangulation.n_active_cells());
       GridTools::get_subdomain_association (triangulation, partition_int);
       const Vector<double> partitioning(partition_int.begin(), partition_int.end());
       data_out.add_data_vector (partitioning, "partitioning");
       data_out.build_patches (); data_out.write_vtk (output1); output1.close();
-      //Write solution for restart
-      //      std::ostringstream filename2; filename2 << "restart-" << cycle << ".U"; std::ofstream output2 (filename2.str().c_str());
-      //      localized_U.block_write(output2); output2.close();
     }
 }
 
@@ -767,45 +744,6 @@ void diffusionMechanics<dim>::run (){
 
   apply_boundary_conditions();
 
-  //Do initial conditions by hand, since VectorTools::interpolate does not work with FE_Nothing
-  /*  hp::QCollection<dim> hp_q_collection;
-  hp_q_collection.push_back(quadrature_formula);
-  hp_q_collection.push_back(quadrature_formula);
-  hp::FEValues<dim> hp_fe_values (fe_collection, hp_q_collection, update_values | update_gradients | update_quadrature_points | update_JxW_values);
-  const unsigned int omega1_dofs_per_cell = omega1_fe.dofs_per_cell;
-
-  VecSet(U0, 0.0);
-  const Point<dim> center(alen/2, blen/2, clen/2);
-  double radius = std::pow(std::pow(alen,2)+std::pow(blen,2)+std::pow(clen,2),0.5)/2.0;
-  for (typename hp::DoFHandler<dim>::active_cell_iterator cell = dof_handler.begin_active();
-       cell != dof_handler.end(); ++cell)
-    {    
-      hp_fe_values.reinit(cell);
-      const FEValues<dim> &fe_values = hp_fe_values.get_present_fe_values();
-      if (cell_is_in_omega1_domain(cell) && cell->subdomain_id() == this_mpi_process)
-	{
-	  const unsigned int dofs_per_cell = cell->get_fe().dofs_per_cell;
-	  Assert (dofs_per_cell == omega1_dofs_per_cell, ExcInternalError());
-	  std::vector<unsigned int> local_dof_indices (dofs_per_cell);
-	  cell->get_dof_indices (local_dof_indices);
-	  for (unsigned int i = 0; i < GeometryInfo<dim>::vertices_per_cell; ++i)
-	    {
-	      const Point<dim>   p = cell->vertex(i);
-	      const unsigned int ck = i*totalDOF + dim;
-	      std::vector<unsigned int> local_dof_indices_U0; 
-	      local_dof_indices_U0.push_back(local_dof_indices[ck]);
-	      local_dof_indices_U0.push_back(local_dof_indices[ck+1]);
-	      Vector<double> local_U0(2);
-	      local_U0(0) = 0.0625;
-	      local_U0(1) = 0.5;
-	      //	      local_U0(1) = 0.9 - 0.45*p.distance(center)/radius;
-	      hanging_node_constraints.distribute_local_to_global(local_U0,
-								  local_dof_indices_U0,
-								  U0);
-	    }
-	}
-    }
-    U0.compress(VectorOperation::insert);*/
   if (restart_step == 0)
     {
       U=U0; Un=U0;
@@ -821,6 +759,7 @@ void diffusionMechanics<dim>::run (){
       //      Un.block_read(input2);
       U = Un;
     }
+
   //Initial time stepping
   currentIncrement=restart_step;
   dt = 0.1;//Initial time step
@@ -829,6 +768,7 @@ void diffusionMechanics<dim>::run (){
     solve(); 
     output_results(currentIncrement); //output solution at current load increment
   }
+
   //Modified time stepping
   dt = 1.0;//Modified time step
   for (currentTime=timeCheck1; currentTime < timeCheck2; currentTime+=dt){
@@ -836,6 +776,7 @@ void diffusionMechanics<dim>::run (){
     solve(); 
     output_results(currentIncrement); //output solution at current load increment
   }
+
   //Modified time stepping
   dt = 2.0;//Modified time step
   for (currentTime=timeCheck2; currentTime <= totalTime; currentTime+=dt){

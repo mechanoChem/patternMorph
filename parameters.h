@@ -1,3 +1,6 @@
+/* IBVP parameters
+   Written by Krishna Garikipati
+ */
 #ifndef parameters_
 #define parameters_
 

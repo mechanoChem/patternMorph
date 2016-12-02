@@ -1,6 +1,6 @@
 /*
  * projectStress.h
- *  Created on: March 4, 2015. S. Rudraraju, K. Garikipati.
+ *  Written by  Shiva Rudraraju and Krishna Garikipati.
  */
 
 #ifndef project_Stress_

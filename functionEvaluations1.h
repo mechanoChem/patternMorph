@@ -1,7 +1,5 @@
-/*
- * functionEvaluations.h
- *
- *  Created on: May 1, 2011
+/* Various functions
+ Written by Shiva Rudraraju and Krishna Garikiapti
  */
 
 #ifndef FUNCTIONEVALUATIONS_H_

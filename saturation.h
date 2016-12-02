@@ -1,5 +1,5 @@
 /* Concentration saturation function for the coupled transport-mechanics code
-   April 2016
+   Written by Krishna Garikipati
 */
 #ifndef saturation_
 #define saturation_
